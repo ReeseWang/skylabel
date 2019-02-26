@@ -60,7 +60,7 @@ class skylabel:
 
     def __init__(
             self, pagesize, qrsize, layout, logowidth, logooffset, textoffset,
-            textsize, defaultPara, matrix=(1, 1),
+            textsize, defaultPara, labelsize, matrix=(1, 1),
             cellsep=(0, 0)):
         self.pagesize = pagesize
         self.qrsize = qrsize
@@ -72,6 +72,7 @@ class skylabel:
         self.matrix = matrix
         self.cellsep = cellsep
         self.defaultPara = defaultPara
+        self.labelsize = labelsize
         self.counter = 0
         self.currentrow = 0
         self.currentcol = 0
@@ -87,7 +88,8 @@ class skylabel:
 
     def genTexPreamable(self):
         return texPreamable + '''\\usepackage[papersize={{{s[0]}mm, {s[1]}mm\
-}}]{{geometry}}\n'''.format(s=self.pagesize) + '''\\begin{document}
+}}]{{geometry}}\n'''.format(s=self.pagesize) + '''\\linespread{0.9}
+\\begin{document}
 \\begin{tikzpicture}[remember picture, overlay, shift=(current page.north west)]
 '''
 
@@ -104,9 +106,9 @@ class skylabel:
             ret += '\\node (qrcode{}) at ({}mm, -{}mm) [anchor=center] '.\
                 format(
                     self.counter,
-                    0.5 * self.pagesize[0] +
+                    0.5 * self.labelsize[0] +
                     (self.currentcol-1)*self.cellsep[0],
-                    0.5 * self.pagesize[0] +
+                    0.5 * self.labelsize[0] +
                     (self.currentrow-1)*self.cellsep[1]
                 )
             ret += '{{\\includesvg[width={}mm]{{./temp/qr{}}}}};\n'.\
@@ -122,16 +124,28 @@ class skylabel:
             pass
         elif self.layout == 'B':
             self.genQRImg(customUrl, para[1])
-            ret += '\\node (qrcode{}) at ({}mm, -{}mm) [anchor=center] '.\
-                format(
+            ret += '''\\node (qrcode{}) at ({}mm, -{}mm) \
+[inner sep=0,anchor=center] '''.format(
                     self.counter,
-                    0.5 * self.pagesize[0] +
+                    0.5 * self.labelsize[0] +
                     (self.currentcol-1)*self.cellsep[0],
-                    0.5 * self.pagesize[0] +
+                    0.5 * self.labelsize[0] +
                     (self.currentrow-1)*self.cellsep[1]
                 )
-            ret += '{' + '\\includesvg[width={}mm]'.format(self.qrsize) + \
-                '{./temp/qr' + str(self.counter) + '}};\n'
+            ret += '{{\\includesvg[width={}mm]{{./temp/qr{}}}}};\n'.\
+                format(self.qrsize, self.counter) + '\\baselineskip=2mm\n'
+            ret += '''\\path (qrcode{c}.south west) -- \
+node[inner sep=0,midway,anchor=west,align=center,font=\\sffamily\\{size}] \
+(logo{c}) {{天空\\\\工场}} (qrcode{c}.south west |- (0mm,-{s}mm);
+'''.format(c=self.counter,
+                size=self.textsize,
+                s=self.labelsize[1] + (self.currentrow-1) * self.cellsep[1])
+            ret += '''\\path (logo{c}.east) -- node\
+[midway,anchor=center,font=\\{size}\\sffamily,align=center] (text{c}) \
+{{{text}}} (logo{c}.east -| qrcode{c}.east);
+'''.format(c=self.counter,
+                size=self.textsize,
+                text=para[0])
             pass
 
         return ret
@@ -143,20 +157,22 @@ types = {
     skylabel(
         pagesize=(50, 80),
         qrsize=45, layout='A', logowidth=35, logooffset=(0, -1),
-        textsize='LARGE', textoffset=(0, -3.5),
-        defaultPara=['天空工场', '天空工场']),
+        textsize='LARGE', textoffset=(0, -3.5), labelsize=(50, 80),
+        defaultPara=[['天空工场', '天空工场']]),
     '5030A':
     skylabel(
         pagesize=(30, 50),
         qrsize=26, layout='A', logowidth=23, logooffset=(0, -1),
-        textsize='large', textoffset=(0, -2.5),
-        defaultPara=['天空工场', '天空工场']),
+        textsize='large', textoffset=(0, -2.5), labelsize=(30, 50),
+        defaultPara=[['天空工场', '天空工场']]),
     '2015TB':  # 20mm x 15mm Triple
     skylabel(
         pagesize=(15, 64),
         qrsize=13, layout='B', logowidth=5, logooffset=(0, 0),
-        textsize='small', textoffset=(0, 0), matrix=(1, 3),
-        cellsep=(0, 22), defaultPara=['天空工场', '天空工场'])
+        textsize='tiny', textoffset=(0, 0), matrix=(1, 3), labelsize=(15, 20),
+        cellsep=(0, 22), defaultPara=[['天空工场', 'Skyworks1'],
+                                      ['天空工场', 'Skyworks2'],
+                                      ['天空工场', 'Skyworks3']])
 }
 
 if __name__ == '__main__':
@@ -195,7 +211,7 @@ if __name__ == '__main__':
         for k, v in types.items():
             tex = v.genTexPreamable()
             for i in range(v.matrix[0] * v.matrix[1]):
-                tex += v.genCell(args.custom_url, v.defaultPara)
+                tex += v.genCell(args.custom_url, v.defaultPara[i])
             pass
             tex += texEnd
             with open('./temp/' + k + '.tex', 'w') as f:
@@ -212,6 +228,7 @@ if __name__ == '__main__':
         with open(args.infile, 'r') as f:
             r = csv.reader(f)
             for i in r:
+                print(i)
                 tex += v.genCell(args.custom_url, i)
         tex += texEnd
         with open('./temp/' + args.outfile + '.tex', 'w') as f:

@@ -7,6 +7,7 @@ import qrcode.image.svg
 import os
 import sys
 import shutil
+import csv
 from subprocess import run
 
 
@@ -20,6 +21,16 @@ texPreamable = '''
 \\usepackage{tikz}
 \\usepackage{svg}
 '''
+
+texEnd = '\\end{tikzpicture}\n\\end{document}'
+
+
+def runtex(jobname):
+    p = run(['xelatex', '-shell-escape', '-interaction=nonstopmode',
+             '-output-directory=./temp', '-halt-on-error',
+             './temp/' + jobname + '.tex'], stdout=sys.stdout,
+            stderr=sys.stderr, encoding='utf-8')
+    assert(p.returncode == 0)
 
 
 class skylabel:
@@ -74,12 +85,18 @@ class skylabel:
         qrcode.make(qrstr, image_factory=factory).save(
             './temp/qr{}.svg'.format(self.counter))
 
+    def genTexPreamable(self):
+        return texPreamable + '''\\usepackage[papersize={{{s[0]}mm, {s[1]}mm\
+}}]{{geometry}}\n'''.format(s=self.pagesize) + '''\\begin{document}
+\\begin{tikzpicture}[remember picture, overlay, shift=(current page.north west)]
+'''
+
     def genCell(self, customUrl, para):
         res = self.new()
         if res == self.NEW_PAGE:
             ret = '\\end{tikzpicture}\\newpage' + \
-                '\\begin{tikzpkcture}[remember picture, overlay, shift=' + \
-                '{(current page.north west)]\n'
+                '\\begin{tikzpicture}[remember picture, overlay, shift=' + \
+                '(current page.north west)]\n'
         else:
             ret = ''
         if self.layout == 'A':
@@ -149,17 +166,20 @@ if __name__ == '__main__':
     parser.add_argument(
         '-i',
         metavar='INPUT',
+        dest='infile',
         help='Input file name.',
         default='input.csv')
     parser.add_argument(
         '-o',
         metavar='OUTPUT',
+        dest='outfile',
         help='Output PDF file name prefix.',
         default='output')
     parser.add_argument(
         '-t',
         metavar='TYPE',
-        default='8050-A',
+        dest='typeSelected',
+        default='8050A',
         choices=types,
         help='Label size and layout.')
     parser.add_argument('-c', '--custom-url', action='store_true')
@@ -173,29 +193,30 @@ if __name__ == '__main__':
     if args.generate_examples:
         os.makedirs('./examples', exist_ok=True)
         for k, v in types.items():
-            tex = texPreamable + '\\usepackage[papersize={' + \
-                '{}mm, {}mm'.format(v.pagesize[0], v.pagesize[1]) + \
-                '}]{geometry}\n' + \
-                '\\begin{document}\n' + \
-                '\\begin{tikzpicture}[remember picture, overlay, shift=' + \
-                '(current page.north west)]\n'
+            tex = v.genTexPreamable()
             for i in range(v.matrix[0] * v.matrix[1]):
                 tex += v.genCell(args.custom_url, v.defaultPara)
             pass
-            tex += '\\end{tikzpicture}\n\\end{document}'
+            tex += texEnd
             with open('./temp/' + k + '.tex', 'w') as f:
                 f.write(tex)
             # Run twice to get node positions right.
-            p = run(['xelatex', '-shell-escape', '-interaction=nonstopmode',
-                     '-output-directory=./temp', '-halt-on-error',
-                     './temp/' + k + '.tex'], stdout=sys.stdout,
-                    encoding='utf-8')
-            assert(p.returncode == 0)
-            p = run(['xelatex', '-shell-escape', '-interaction=nonstopmode',
-                     '-output-directory=./temp', '-halt-on-error',
-                     './temp/' + k + '.tex'], stdout=sys.stdout,
-                    encoding='utf-8')
-            assert(p.returncode == 0)
+            runtex(k)
+            runtex(k)
             p = run(['pdftopng', './temp/' + k + '.pdf', './examples/' + k],
-                    stdout=sys.stdout)
+                    stdout=sys.stdout, stderr=sys.stderr)
             assert(p.returncode == 0)
+    else:
+        v = types[args.typeSelected]
+        tex = v.genTexPreamable()
+        with open(args.infile, 'r') as f:
+            r = csv.reader(f)
+            for i in r:
+                tex += v.genCell(args.custom_url, i)
+        tex += texEnd
+        with open('./temp/' + args.outfile + '.tex', 'w') as f:
+            f.write(tex)
+        # Run twice
+        runtex(args.outfile)
+        runtex(args.outfile)
+        shutil.copy('./temp/' + args.outfile + '.pdf', './')

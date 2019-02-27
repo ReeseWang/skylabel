@@ -226,7 +226,7 @@ if __name__ == '__main__':
         v = types[args.typeSelected]
         tex = v.genTexPreamable()
         with open(args.infile, 'r') as f:
-            r = csv.reader(f)
+            r = csv.reader(filter(lambda row: row[0]!='#', f))
             for i in r:
                 print(i)
                 tex += v.genCell(args.custom_url, i)

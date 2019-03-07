@@ -77,11 +77,11 @@ class skylabel:
         self.currentrow = 0
         self.currentcol = 0
 
-    def genQRImg(self, customUrl, content):
-        if customUrl:
-            qrstr = urllib.parse.quote(content)
-        else:
-            qrstr = urlPrefix + urllib.parse.quote(content)
+    def genQRImg(self, qrstr):
+        if not self.noenc:
+            qrstr = urllib.parse.quote(qrstr)
+        if not self.noUrlPrefix:
+            qrstr = urlPrefix + urllib.parse.quote(qrstr)
         factory = qrcode.image.svg.SvgPathImage
         qrcode.make(qrstr, image_factory=factory).save(
             './temp/qr{}.svg'.format(self.counter))
@@ -93,7 +93,7 @@ class skylabel:
 \\begin{tikzpicture}[remember picture, overlay, shift=(current page.north west)]
 '''
 
-    def genCell(self, customUrl, para):
+    def genCell(self, para):
         res = self.new()
         if res == self.NEW_PAGE:
             ret = '\\end{tikzpicture}\\newpage' + \
@@ -102,7 +102,7 @@ class skylabel:
         else:
             ret = ''
         if self.layout == 'A':
-            self.genQRImg(customUrl, para[1])
+            self.genQRImg(para[1])
             ret += '\\node (qrcode{}) at ({}mm, -{}mm) [anchor=center] '.\
                 format(
                     self.counter,
@@ -123,7 +123,7 @@ class skylabel:
 '''.format(s=self.textoffset, c=self.counter, size=self.textsize, text=para[0])
             pass
         elif self.layout == 'B':
-            self.genQRImg(customUrl, para[1])
+            self.genQRImg(para[1])
             ret += '''\\node (qrcode{}) at ({}mm, -{}mm) \
 [inner sep=0,anchor=center] '''.format(
                     self.counter,
@@ -136,9 +136,10 @@ class skylabel:
                 format(self.qrsize, self.counter) + '\\baselineskip=2mm\n'
             ret += '''\\path (qrcode{c}.south west) -- \
 node[inner sep=0,midway,anchor=west,align=center,font=\\sffamily\\{size}] \
-(logo{c}) {{天空\\\\工场}} (qrcode{c}.south west |- (0mm,-{s}mm);
+(logo{c}) {{{logoText}}} (qrcode{c}.south west |- (0mm,-{s}mm);
 '''.format(c=self.counter,
                 size=self.textsize,
+                logoText=self.logoText,
                 s=self.labelsize[1] + (self.currentrow-1) * self.cellsep[1])
             ret += '''\\path (logo{c}.east) -- node\
 [midway,anchor=center,font=\\{size}\\sffamily,align=center] (text{c}) \
@@ -198,7 +199,16 @@ if __name__ == '__main__':
         default='8050A',
         choices=types,
         help='Label size and layout.')
-    parser.add_argument('-c', '--custom-url', action='store_true')
+    parser.add_argument(
+        '-u',
+        metavar='TEXT',
+        dest='logoText',
+        default='天空\\\\工场',
+        help='Custom logo text, only applicable to certain layouts.')
+    parser.add_argument('--no-url-prefix', action='store_true')
+    parser.add_argument('--noenc',
+                        action='store_true',
+                        help="Don't encode URL with urllib.parse.quote")
     parser.add_argument('--generate-examples', action='store_true')
     parser.add_argument('--debug', action='store_true')
 
@@ -209,9 +219,12 @@ if __name__ == '__main__':
     if args.generate_examples:
         os.makedirs('./examples', exist_ok=True)
         for k, v in types.items():
+            v.logoText=args.logoText
+            v.noenc=args.noenc
+            v.noUrlPrefix=args.no_url_prefix
             tex = v.genTexPreamable()
             for i in range(v.matrix[0] * v.matrix[1]):
-                tex += v.genCell(args.custom_url, v.defaultPara[i])
+                tex += v.genCell(v.defaultPara[i])
             pass
             tex += texEnd
             with open('./temp/' + k + '.tex', 'w') as f:
@@ -224,12 +237,15 @@ if __name__ == '__main__':
             assert(p.returncode == 0)
     else:
         v = types[args.typeSelected]
+        v.logoText=args.logoText
+        v.noenc=args.noenc
+        v.noUrlPrefix=args.no_url_prefix
         tex = v.genTexPreamable()
         with open(args.infile, 'r') as f:
-            r = csv.reader(filter(lambda row: row[0]!='#', f))
+            r = csv.reader(filter(lambda row: row[0] != '#', f))
             for i in r:
                 print(i)
-                tex += v.genCell(args.custom_url, i)
+                tex += v.genCell(i)
         tex += texEnd
         with open('./temp/' + args.outfile + '.tex', 'w') as f:
             f.write(tex)

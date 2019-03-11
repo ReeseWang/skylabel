@@ -4,5 +4,6 @@ Python scripts for creating adhesive labels used on properties, drawers and stor
 Dependencies:
 
 * `texlive` (packages: `ctex`, `tikz`, `svg`)
+* `inkscape` (for `svg` to work correctly)
 * `python3` (modules: `qrcode`)
-* `xpdf` (providing executable `pdftopng`)
+* `xpdf` (providing executable `pdftopng`, only for generating example graphics)

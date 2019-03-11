@@ -20,6 +20,8 @@ texPreamable = '''
 \\usepackage{graphicx}
 \\usepackage{tikz}
 \\usepackage{svg}
+\\usetikzlibrary{fit,calc}
+\\usepackage{qrcode}
 '''
 
 texEnd = '\\end{tikzpicture}\n\\end{document}'
@@ -61,7 +63,7 @@ class skylabel:
     def __init__(
             self, pagesize, qrsize, layout, logowidth, logooffset, textoffset,
             textsize, defaultPara, labelsize, matrix=(1, 1),
-            cellsep=(0, 0)):
+            cellsep=(0, 0), example=False):
         self.pagesize = pagesize
         self.qrsize = qrsize
         self.layout = layout
@@ -73,6 +75,7 @@ class skylabel:
         self.cellsep = cellsep
         self.defaultPara = defaultPara
         self.labelsize = labelsize
+        self.example = example
         self.counter = 0
         self.currentrow = 0
         self.currentcol = 0
@@ -81,15 +84,18 @@ class skylabel:
         if not self.noenc:
             qrstr = urllib.parse.quote(qrstr)
         if not self.noUrlPrefix:
-            qrstr = urlPrefix + urllib.parse.quote(qrstr)
+            qrstr = urlPrefix + qrstr
         factory = qrcode.image.svg.SvgPathImage
         qrcode.make(qrstr, image_factory=factory).save(
             './temp/qr{}.svg'.format(self.counter))
 
     def genTexPreamable(self):
+        if self.layout == 'B':
+            linespread = '\\linespread{0.9}\n'
+        else:
+            linespread = ''
         return texPreamable + '''\\usepackage[papersize={{{s[0]}mm, {s[1]}mm\
-}}]{{geometry}}\n'''.format(s=self.pagesize) + '''\\linespread{0.9}
-\\begin{document}
+}}]{{geometry}}\n'''.format(s=self.pagesize) + linespread + '''\\begin{document}
 \\begin{tikzpicture}[remember picture, overlay, shift=(current page.north west)]
 '''
 
@@ -133,7 +139,7 @@ class skylabel:
                     (self.currentrow-1)*self.cellsep[1]
                 )
             ret += '{{\\includesvg[width={}mm]{{./temp/qr{}}}}};\n'.\
-                format(self.qrsize, self.counter) + '\\baselineskip=2mm\n'
+                format(self.qrsize, self.counter)
             ret += '''\\path (qrcode{c}.south west) -- \
 node[inner sep=0,midway,anchor=west,align=center,font=\\sffamily\\{size}] \
 (logo{c}) {{{logoText}}} (qrcode{c}.south west |- (0mm,-{s}mm);
@@ -147,6 +153,15 @@ node[inner sep=0,midway,anchor=west,align=center,font=\\sffamily\\{size}] \
 '''.format(c=self.counter,
                 size=self.textsize,
                 text=para[0])
+            pass
+        elif self.layout == 'PASSSEAL':
+            with open('./passwordseal.tex', 'r') as f:
+                ret += f.read().\
+                    replace('realname', para[0]).\
+                    replace('studentid', para[1]).\
+                    replace('username', para[2]).\
+                    replace('password', para[3]).\
+                    replace('wifipw', para[4])
             pass
 
         return ret
@@ -173,7 +188,16 @@ types = {
         textsize='tiny', textoffset=(0, 0), matrix=(1, 3), labelsize=(15, 20),
         cellsep=(0, 22), defaultPara=[['天空工场', 'Skyworks1'],
                                       ['天空工场', 'Skyworks2'],
-                                      ['天空工场', 'Skyworks3']])
+                                      ['天空工场', 'Skyworks3']]),
+    'PASSSEAL':  # New member's password seal
+    skylabel(
+        pagesize=(164.6, 76.2),
+        qrsize=None, layout='PASSSEAL', logowidth=None, logooffset=None,
+        textsize=None, textoffset=None, labelsize=(164.6, 76.2),
+        defaultPara=[['李超进', '2015365829', 'licao\\_j', '7uzpLDTP',
+                      '9woofiJ5M4TL'],
+                     ['高亦驰', '2016384732', 'gy-chuan92', 'p6wh6Grq',
+                      'xYdoRZU4QUcm']])
 }
 
 if __name__ == '__main__':
@@ -219,12 +243,12 @@ if __name__ == '__main__':
     if args.generate_examples:
         os.makedirs('./examples', exist_ok=True)
         for k, v in types.items():
-            v.logoText=args.logoText
-            v.noenc=args.noenc
-            v.noUrlPrefix=args.no_url_prefix
+            v.logoText = args.logoText
+            v.noenc = args.noenc
+            v.noUrlPrefix = args.no_url_prefix
             tex = v.genTexPreamable()
-            for i in range(v.matrix[0] * v.matrix[1]):
-                tex += v.genCell(v.defaultPara[i])
+            for i in v.defaultPara:
+                tex += v.genCell(i)
             pass
             tex += texEnd
             with open('./temp/' + k + '.tex', 'w') as f:
@@ -237,9 +261,9 @@ if __name__ == '__main__':
             assert(p.returncode == 0)
     else:
         v = types[args.typeSelected]
-        v.logoText=args.logoText
-        v.noenc=args.noenc
-        v.noUrlPrefix=args.no_url_prefix
+        v.logoText = args.logoText
+        v.noenc = args.noenc
+        v.noUrlPrefix = args.no_url_prefix
         tex = v.genTexPreamable()
         with open(args.infile, 'r') as f:
             r = csv.reader(filter(lambda row: row[0] != '#', f))

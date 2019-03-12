@@ -155,6 +155,10 @@ node[inner sep=0,midway,anchor=west,align=center,font=\\sffamily\\{size}] \
                 text=para[0])
             pass
         elif self.layout == 'PASSSEAL':
+            if self.example:
+                ret += '\\tikzset{example/.style={fill=black!25}}\n'
+            else:
+                ret += '\\tikzset{example/.style={}}\n'
             with open('./passwordseal.tex', 'r') as f:
                 ret += f.read().\
                     replace('realname', para[0]).\
@@ -191,7 +195,7 @@ types = {
                                       ['天空工场', 'Skyworks3']]),
     'PASSSEAL':  # New member's password seal
     skylabel(
-        pagesize=(164.6, 76.2),
+        pagesize=(190, 76.2),
         qrsize=None, layout='PASSSEAL', logowidth=None, logooffset=None,
         textsize=None, textoffset=None, labelsize=(164.6, 76.2),
         defaultPara=[['李超进', '2015365829', 'licao\\_j', '7uzpLDTP',
@@ -243,6 +247,7 @@ if __name__ == '__main__':
     if args.generate_examples:
         os.makedirs('./examples', exist_ok=True)
         for k, v in types.items():
+            v.example = True
             v.logoText = args.logoText
             v.noenc = args.noenc
             v.noUrlPrefix = args.no_url_prefix

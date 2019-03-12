@@ -62,7 +62,7 @@ class skylabel:
 
     def __init__(
             self, pagesize, qrsize, layout, logowidth, logooffset, textoffset,
-            textsize, defaultPara, labelsize, matrix=(1, 1),
+            textsize, labelsize, matrix=(1, 1),
             cellsep=(0, 0), example=False):
         self.pagesize = pagesize
         self.qrsize = qrsize
@@ -73,7 +73,6 @@ class skylabel:
         self.textsize = textsize
         self.matrix = matrix
         self.cellsep = cellsep
-        self.defaultPara = defaultPara
         self.labelsize = labelsize
         self.example = example
         self.counter = 0
@@ -171,37 +170,43 @@ node[inner sep=0,midway,anchor=west,align=center,font=\\sffamily\\{size}] \
         return ret
         pass
 
+    def genOutput(self, input, outprefix):
+        tex = self.genTexPreamable()
+        with open(input, 'r') as f:
+            r = csv.reader(filter(lambda row: row[0] != '#', f))
+            for i in r:
+                print(i)
+                tex += self.genCell(i)
+        tex += texEnd
+        with open('./temp/' + outprefix + '.tex', 'w') as f:
+            f.write(tex)
+        # Run twice
+        runtex(outprefix)
+        runtex(outprefix)
+
 
 types = {
     '8050A':
     skylabel(
         pagesize=(50, 80),
         qrsize=45, layout='A', logowidth=35, logooffset=(0, -1),
-        textsize='LARGE', textoffset=(0, -3.5), labelsize=(50, 80),
-        defaultPara=[['天空工场', '天空工场']]),
+        textsize='LARGE', textoffset=(0, -3.5), labelsize=(50, 80)),
     '5030A':
     skylabel(
         pagesize=(30, 50),
         qrsize=26, layout='A', logowidth=23, logooffset=(0, -1),
-        textsize='large', textoffset=(0, -2.5), labelsize=(30, 50),
-        defaultPara=[['天空工场', '天空工场']]),
+        textsize='large', textoffset=(0, -2.5), labelsize=(30, 50)),
     '2015TB':  # 20mm x 15mm Triple
     skylabel(
         pagesize=(15, 64),
         qrsize=13, layout='B', logowidth=5, logooffset=(0, 0),
         textsize='tiny', textoffset=(0, 0), matrix=(1, 3), labelsize=(15, 20),
-        cellsep=(0, 22), defaultPara=[['天空工场', 'Skyworks1'],
-                                      ['天空工场', 'Skyworks2'],
-                                      ['天空工场', 'Skyworks3']]),
+        cellsep=(0, 22)),
     'PASSSEAL':  # New member's password seal
     skylabel(
         pagesize=(190, 76.2),
         qrsize=None, layout='PASSSEAL', logowidth=None, logooffset=None,
-        textsize=None, textoffset=None, labelsize=(164.6, 76.2),
-        defaultPara=[['李超进', '2015365829', 'licao\\_j', '7uzpLDTP',
-                      '9woofiJ5M4TL'],
-                     ['高亦驰', '2016384732', 'gy-chuan92', 'p6wh6Grq',
-                      'xYdoRZU4QUcm']])
+        textsize=None, textoffset=None, labelsize=(164.6, 76.2))
 }
 
 if __name__ == '__main__':
@@ -245,22 +250,12 @@ if __name__ == '__main__':
     shutil.rmtree('./temp')
     os.makedirs('./temp')
     if args.generate_examples:
-        os.makedirs('./examples', exist_ok=True)
         for k, v in types.items():
             v.example = True
             v.logoText = args.logoText
             v.noenc = args.noenc
             v.noUrlPrefix = args.no_url_prefix
-            tex = v.genTexPreamable()
-            for i in v.defaultPara:
-                tex += v.genCell(i)
-            pass
-            tex += texEnd
-            with open('./temp/' + k + '.tex', 'w') as f:
-                f.write(tex)
-            # Run twice to get node positions right.
-            runtex(k)
-            runtex(k)
+            v.genOutput('./examples/' + k + '-example.csv', k)
             p = run(['pdftopng', './temp/' + k + '.pdf', './examples/' + k],
                     stdout=sys.stdout, stderr=sys.stderr)
             assert(p.returncode == 0)
@@ -269,16 +264,5 @@ if __name__ == '__main__':
         v.logoText = args.logoText
         v.noenc = args.noenc
         v.noUrlPrefix = args.no_url_prefix
-        tex = v.genTexPreamable()
-        with open(args.infile, 'r') as f:
-            r = csv.reader(filter(lambda row: row[0] != '#', f))
-            for i in r:
-                print(i)
-                tex += v.genCell(i)
-        tex += texEnd
-        with open('./temp/' + args.outfile + '.tex', 'w') as f:
-            f.write(tex)
-        # Run twice
-        runtex(args.outfile)
-        runtex(args.outfile)
+        v.genOutput(args.infile, args.outfile)
         shutil.copy('./temp/' + args.outfile + '.pdf', './')

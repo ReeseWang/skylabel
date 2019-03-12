@@ -206,7 +206,7 @@ types = {
     skylabel(
         pagesize=(190, 76.2),
         qrsize=None, layout='PASSSEAL', logowidth=None, logooffset=None,
-        textsize=None, textoffset=None, labelsize=(164.6, 76.2))
+        textsize=None, textoffset=None, labelsize=(190, 76.2))
 }
 
 if __name__ == '__main__':

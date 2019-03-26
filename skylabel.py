@@ -15,7 +15,7 @@ urlPrefix = 'https://wiki.thu-skyworks.org/'
 
 texPreamable = '''
 \\documentclass{minimal}
-\\usepackage[UTF8]{ctex}
+\\usepackage[UTF8,fontset=founder]{ctex}
 \\usepackage{hyperref}
 \\usepackage{graphicx}
 \\usepackage{tikz}
